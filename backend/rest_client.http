@@ -1,0 +1,817 @@
+###############################################################
+#  Breck Barber - Testes de integracao da API
+#  Extensao recomendada: REST Client (humao.rest-client) no VS Code
+#
+#  ORDEM SUGERIDA:
+#  1) Rode "npm run seed" no backend para carregar dados.
+#  2) Execute 1.1 (login admin) e 1.2 (login cliente) - os tokens
+#     sao capturados automaticamente pelas variaveis abaixo.
+#  3) Siga as secoes na ordem.
+###############################################################
+
+@host = http://localhost:3333
+# Ao testar o deploy, troque por:
+# @host = https://SEU-PROJETO.up.railway.app
+
+@contentType = application/json
+
+# Tokens capturados das respostas de login (nao edite manualmente).
+@tokenAdmin = {{loginAdmin.response.body.dados.token}}
+@tokenCliente = {{loginCliente.response.body.dados.token}}
+@idClienteLogado = {{loginCliente.response.body.dados.usuario.id}}
+
+
+###############################################################
+# 0. SANIDADE
+###############################################################
+
+### 0.1 Raiz da API (lista os endpoints)
+GET {{host}}/
+
+### 0.2 Health check
+GET {{host}}/health
+
+
+###############################################################
+# 1. AUTENTICACAO  (POST /login - publico)
+###############################################################
+
+### 1.1 Login do ADMIN
+# @name loginAdmin
+POST {{host}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@breckbarber.com",
+  "senha": "admin123"
+}
+
+### 1.2 Login do CLIENTE
+# @name loginCliente
+POST {{host}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "joao.cliente@email.com",
+  "senha": "cliente123"
+}
+
+### 1.3 Login com senha errada -> 401
+POST {{host}}/login
+Content-Type: {{contentType}}
+
+{
+  "email": "joao.cliente@email.com",
+  "senha": "senha-errada"
+}
+
+### 1.4 Validar o token guardado -> 200
+GET {{host}}/login/validar
+Authorization: Bearer {{tokenCliente}}
+
+### 1.5 Validar sem token -> 401
+GET {{host}}/login/validar
+
+
+###############################################################
+# 2. USUARIOS
+###############################################################
+
+### 2.1 Cadastrar novo cliente (POST publico) -> 201
+# @name novoCliente
+POST {{host}}/usuarios
+Content-Type: {{contentType}}
+
+{
+  "nome": "Carlos Eduardo Ramos",
+  "email": "carlos.ramos@email.com",
+  "senha": "senha123",
+  "cpf": "39053344705",
+  "telefone": "(11) 96666-3030",
+  "cep": "01414001",
+  "logradouro": "Rua Haddock Lobo",
+  "numero": "595",
+  "complemento": "Casa 2",
+  "bairro": "Cerqueira Cesar",
+  "cidade": "Sao Paulo",
+  "uf": "SP"
+}
+
+### 2.2 Cadastro com CPF matematicamente invalido -> 400
+POST {{host}}/usuarios
+Content-Type: {{contentType}}
+
+{
+  "nome": "Teste CPF Invalido",
+  "email": "cpf.invalido@email.com",
+  "senha": "senha123",
+  "cpf": "12345678900",
+  "cep": "01414001",
+  "logradouro": "Rua Haddock Lobo",
+  "numero": "595",
+  "bairro": "Cerqueira Cesar",
+  "cidade": "Sao Paulo",
+  "uf": "SP"
+}
+
+### 2.3 Cadastro com e-mail ja existente -> 409
+POST {{host}}/usuarios
+Content-Type: {{contentType}}
+
+{
+  "nome": "Outro Joao",
+  "email": "joao.cliente@email.com",
+  "senha": "senha123",
+  "cpf": "15350946056",
+  "cep": "01414001",
+  "logradouro": "Rua Haddock Lobo",
+  "numero": "100",
+  "bairro": "Cerqueira Cesar",
+  "cidade": "Sao Paulo",
+  "uf": "SP"
+}
+
+### 2.4 Cadastro com campos obrigatorios faltando -> 400
+POST {{host}}/usuarios
+Content-Type: {{contentType}}
+
+{
+  "nome": "Sem Endereco",
+  "email": "sem.endereco@email.com",
+  "senha": "senha123"
+}
+
+### 2.5 Perfil do usuario logado (GET privado) -> 200
+GET {{host}}/usuarios/perfil
+Authorization: Bearer {{tokenCliente}}
+
+### 2.6 Listar todos os usuarios (GET geral - admin) -> 200
+GET {{host}}/usuarios
+Authorization: Bearer {{tokenAdmin}}
+
+### 2.7 Listar usuarios sem ser admin -> 403
+GET {{host}}/usuarios
+Authorization: Bearer {{tokenCliente}}
+
+### 2.8 Consultar usuario por NOME (admin) -> 200
+GET {{host}}/usuarios/buscar?nome=Joao
+Authorization: Bearer {{tokenAdmin}}
+
+### 2.9 Consultar usuario por CPF (admin) -> 200
+GET {{host}}/usuarios/buscar?cpf=11144477735
+Authorization: Bearer {{tokenAdmin}}
+
+### 2.10 Consultar usuario por CODIGO/ID -> 200
+GET {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+
+### 2.11 Atualizacao COMPLETA do cadastro (PUT) -> 200
+PUT {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Joao Ricardo Alves",
+  "email": "joao.cliente@email.com",
+  "telefone": "(11) 97777-4040",
+  "cep": "04538133",
+  "logradouro": "Avenida Brigadeiro Faria Lima",
+  "numero": "3477",
+  "complemento": "Bloco B",
+  "bairro": "Itaim Bibi",
+  "cidade": "Sao Paulo",
+  "uf": "SP"
+}
+
+### 2.12 PUT sem os campos obrigatorios -> 400
+PUT {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Joao Ricardo Alves"
+}
+
+### 2.13 Atualizacao PARCIAL (PATCH - so o telefone) -> 200
+PATCH {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "telefone": "(11) 95555-8080"
+}
+
+### 2.14 Alterar apenas a senha (PATCH) -> 200
+PATCH {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "senha": "novasenha123"
+}
+
+### 2.15 Voltar a senha original
+PATCH {{host}}/usuarios/{{idClienteLogado}}
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "senha": "cliente123"
+}
+
+### 2.16 Tentar editar dados de OUTRO usuario -> 403
+PATCH {{host}}/usuarios/1
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Invasao de conta"
+}
+
+### 2.17 Excluir usuario (DELETE - admin). Ajuste o id conforme 2.1.
+DELETE {{host}}/usuarios/3
+Authorization: Bearer {{tokenAdmin}}
+
+
+###############################################################
+# 3. CATEGORIAS
+###############################################################
+
+### 3.1 Listar categorias (GET geral - publico)
+GET {{host}}/categorias
+
+### 3.2 Consultar categoria por CODIGO/ID (publico)
+GET {{host}}/categorias/2
+
+### 3.3 Consultar categoria por NOME (publico)
+GET {{host}}/categorias/buscar?nome=Barba
+
+### 3.4 Cadastrar categoria (POST - admin) -> 201
+# @name novaCategoria
+POST {{host}}/categorias
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Perfumaria Masculina",
+  "descricao": "Colonias e desodorantes com o cheiro da barbearia.",
+  "segmento": "CABELO",
+  "icone": "shampoo"
+}
+
+### 3.5 Cadastrar categoria duplicada -> 409
+POST {{host}}/categorias
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Barba e Bigode",
+  "segmento": "BARBA"
+}
+
+### 3.6 Atualizar categoria COMPLETA (PUT - admin)
+PUT {{host}}/categorias/{{novaCategoria.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "nome": "Perfumaria Masculina",
+  "descricao": "Colonias, desodorantes e talco de barbearia.",
+  "segmento": "CABELO",
+  "icone": "pomada",
+  "ativo": true
+}
+
+### 3.7 Atualizar categoria PARCIAL (PATCH - admin)
+PATCH {{host}}/categorias/{{novaCategoria.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "descricao": "Fixadores de cheiro para o pos-atendimento."
+}
+
+### 3.8 Categoria sem token -> 401
+POST {{host}}/categorias
+Content-Type: {{contentType}}
+
+{
+  "nome": "Categoria sem autenticacao"
+}
+
+### 3.9 Excluir categoria com produtos vinculados -> 409
+DELETE {{host}}/categorias/1
+Authorization: Bearer {{tokenAdmin}}
+
+### 3.10 Excluir categoria vazia (DELETE - admin) -> 200
+DELETE {{host}}/categorias/{{novaCategoria.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+
+
+###############################################################
+# 4. PRODUTOS
+###############################################################
+
+### 4.1 Listar todos os produtos (GET geral - publico)
+GET {{host}}/produtos
+
+### 4.2 Consultar produto por CODIGO (publico)
+GET {{host}}/produtos/codigo/POM-001
+
+### 4.3 Consultar produto por NOME (publico)
+GET {{host}}/produtos/buscar?nome=barba
+
+### 4.4 Consultar produto por ID (publico)
+GET {{host}}/produtos/1
+
+### 4.5 Produto inexistente -> 404
+GET {{host}}/produtos/9999
+
+### 4.6 Filtrar por categoria (slug)
+GET {{host}}/produtos?categoria=navalhas-e-tesouras
+
+### 4.7 Filtrar por tipo + faixa de preco + ordenacao
+GET {{host}}/produtos?tipo=COSMETICO&precoMin=40&precoMax=80&ordenar=preco_asc
+
+### 4.8 Cadastrar produto (POST - admin) -> 201
+# @name novoProduto
+POST {{host}}/produtos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-010",
+  "nome": "Pomada Modeladora Edicao Limitada 150g",
+  "descricao": "Fixacao forte com acabamento seco e aroma de couro curtido.",
+  "preco": 89.9,
+  "tipo": "COSMETICO",
+  "linha": "Cabelo",
+  "finalidade": "Fixacao forte",
+  "marca": "Breck",
+  "categoria_id": 1,
+  "quantidade_estoque": 20,
+  "quantidade_minima": 5,
+  "especificacoes": {
+    "peso_g": 150,
+    "fixacao": "Forte (4/5)",
+    "brilho": "Matte (sem brilho)",
+    "aroma": "Couro e tabaco"
+  }
+}
+
+### 4.9 Cadastrar produto sem token -> 401
+POST {{host}}/produtos
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-011",
+  "nome": "Produto sem autenticacao",
+  "preco": 50,
+  "categoria_id": 1
+}
+
+### 4.10 Cadastrar produto como CLIENTE -> 403
+POST {{host}}/produtos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-012",
+  "nome": "Produto criado por cliente",
+  "preco": 50,
+  "categoria_id": 1
+}
+
+### 4.11 Codigo duplicado -> 409
+POST {{host}}/produtos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-001",
+  "nome": "Codigo repetido",
+  "preco": 60,
+  "categoria_id": 1
+}
+
+### 4.12 Categoria inexistente -> 404
+POST {{host}}/produtos
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-013",
+  "nome": "Categoria fantasma",
+  "preco": 60,
+  "categoria_id": 999
+}
+
+### 4.13 Atualizacao COMPLETA (PUT - admin) -> 200
+PUT {{host}}/produtos/{{novoProduto.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "POM-010",
+  "nome": "Pomada Modeladora Edicao Limitada 150g",
+  "descricao": "Fixacao forte, acabamento seco e aroma de couro curtido. Nova formula.",
+  "preco": 94.9,
+  "tipo": "COSMETICO",
+  "linha": "Cabelo",
+  "finalidade": "Fixacao forte",
+  "marca": "Breck",
+  "categoria_id": 1,
+  "ativo": true,
+  "especificacoes": {
+    "peso_g": 150,
+    "fixacao": "Extra forte (5/5)",
+    "brilho": "Matte (sem brilho)",
+    "aroma": "Couro e tabaco"
+  }
+}
+
+### 4.14 Atualizacao PARCIAL (PATCH - so o preco) -> 200
+PATCH {{host}}/produtos/{{novoProduto.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "preco": 79.9
+}
+
+### 4.15 PUT em produto inexistente -> 404
+PUT {{host}}/produtos/9999
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "codigo": "XXX-999",
+  "nome": "Produto fantasma",
+  "preco": 10,
+  "categoria_id": 1
+}
+
+### 4.16 Excluir produto (DELETE - admin) -> 200
+DELETE {{host}}/produtos/{{novoProduto.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+
+### 4.17 Excluir produto que ja foi vendido -> desativa (200)
+DELETE {{host}}/produtos/1
+Authorization: Bearer {{tokenAdmin}}
+
+
+###############################################################
+# 5. ESTOQUE  (todas as rotas exigem ADMIN)
+###############################################################
+
+### 5.1 Posicao geral do estoque
+GET {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+
+### 5.2 Somente itens criticos
+GET {{host}}/estoque?critico=true
+Authorization: Bearer {{tokenAdmin}}
+
+### 5.3 Consultar estoque pelo produto
+GET {{host}}/estoque/produto/20
+Authorization: Bearer {{tokenAdmin}}
+
+### 5.4 ENTRADA de 50 unidades
+POST {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "produto_id": 20,
+  "tipo": "ENTRADA",
+  "quantidade": 50
+}
+
+### 5.5 SAIDA de 5 unidades
+POST {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "produto_id": 20,
+  "tipo": "SAIDA",
+  "quantidade": 5
+}
+
+### 5.6 SAIDA maior que o saldo -> 400
+POST {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "produto_id": 20,
+  "tipo": "SAIDA",
+  "quantidade": 99999
+}
+
+### 5.7 AJUSTE: define o saldo exato
+POST {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "produto_id": 20,
+  "tipo": "AJUSTE",
+  "quantidade": 12
+}
+
+### 5.8 Movimentacao de produto inexistente -> 404
+POST {{host}}/estoque
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "produto_id": 9999,
+  "tipo": "ENTRADA",
+  "quantidade": 10
+}
+
+### 5.9 Atualizacao COMPLETA do registro (PUT)
+PUT {{host}}/estoque/20
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "quantidade": 15,
+  "quantidade_minima": 4,
+  "ilimitado": false,
+  "localizacao": "LOJA-MATRIZ"
+}
+
+### 5.10 Atualizacao PARCIAL (PATCH - so o minimo)
+PATCH {{host}}/estoque/20
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "quantidade_minima": 6
+}
+
+### 5.11 Estoque sem token -> 401
+GET {{host}}/estoque
+
+
+###############################################################
+# 6. PEDIDOS  (checkout e ciclo de vida)
+###############################################################
+
+### 6.1 Finalizar pedido (POST /pedidos) -> 201
+# @name pedidoSimples
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 5, "quantidade": 1 },
+    { "produto_id": 9, "quantidade": 1 }
+  ],
+  "forma_pagamento": "PIX",
+  "observacao": "Primeiro pedido de teste."
+}
+
+### 6.2 Pedido grande (dispara faixa de 15% + bonus de volume)
+# @name pedidoGrande
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 13, "quantidade": 1 },
+    { "produto_id": 1, "quantidade": 6 },
+    { "produto_id": 6, "quantidade": 4 }
+  ],
+  "forma_pagamento": "CARTAO"
+}
+
+### 6.3 Pedido so com produto digital (sem frete, entrega imediata)
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 26, "quantidade": 1 }
+  ],
+  "forma_pagamento": "PIX"
+}
+
+### 6.4 Checkout SEM token -> 401
+POST {{host}}/pedidos
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 5, "quantidade": 1 }
+  ]
+}
+
+### 6.5 Produto esgotado (MAQ-004, estoque zero) -> 409
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 16, "quantidade": 1 }
+  ]
+}
+
+### 6.6 Quantidade acima do estoque -> 409
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 20, "quantidade": 999 }
+  ]
+}
+
+### 6.7 Carrinho vazio -> 400
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": []
+}
+
+### 6.8 Produto inexistente no carrinho -> 404
+POST {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: {{contentType}}
+
+{
+  "itens": [
+    { "produto_id": 9999, "quantidade": 1 }
+  ]
+}
+
+### 6.9 Historico do cliente logado (GET /pedidos/meus-pedidos)
+GET {{host}}/pedidos/meus-pedidos
+Authorization: Bearer {{tokenCliente}}
+
+### 6.10 Consultar pedido por CODIGO
+GET {{host}}/pedidos/buscar?codigo={{pedidoSimples.response.body.dados.codigo}}
+Authorization: Bearer {{tokenCliente}}
+
+### 6.11 Consultar pedido por ID
+GET {{host}}/pedidos/{{pedidoSimples.response.body.dados.id}}
+Authorization: Bearer {{tokenCliente}}
+
+### 6.12 Listar TODOS os pedidos (admin)
+GET {{host}}/pedidos
+Authorization: Bearer {{tokenAdmin}}
+
+### 6.13 Listar pedidos filtrando por status (admin)
+GET {{host}}/pedidos?status=PAGO
+Authorization: Bearer {{tokenAdmin}}
+
+### 6.14 Cliente tentando listar todos -> 403
+GET {{host}}/pedidos
+Authorization: Bearer {{tokenCliente}}
+
+### 6.15 Avancar status PAGO -> ENVIADO (PATCH - admin)
+PATCH {{host}}/pedidos/{{pedidoSimples.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "ENVIADO"
+}
+
+### 6.16 Atualizacao completa do status (PUT - admin)
+PUT {{host}}/pedidos/{{pedidoSimples.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "CONCLUIDO",
+  "observacao": "Entregue e conferido pelo cliente."
+}
+
+### 6.17 Transicao invalida (CONCLUIDO -> PENDENTE) -> 409
+PATCH {{host}}/pedidos/{{pedidoSimples.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "PENDENTE"
+}
+
+### 6.18 Cancelar pedido e estornar estoque (DELETE - admin)
+DELETE {{host}}/pedidos/{{pedidoGrande.response.body.dados.id}}
+Authorization: Bearer {{tokenAdmin}}
+
+
+###############################################################
+# 7. ENTREGAS
+###############################################################
+
+### 7.1 Listar entregas (admin)
+GET {{host}}/entregas
+Authorization: Bearer {{tokenAdmin}}
+
+### 7.2 Filtrar entregas por status (admin)
+GET {{host}}/entregas?status=AGUARDANDO
+Authorization: Bearer {{tokenAdmin}}
+
+### 7.3 Consultar entrega por ID
+GET {{host}}/entregas/1
+Authorization: Bearer {{tokenAdmin}}
+
+### 7.4 Consultar por codigo de rastreio
+GET {{host}}/entregas/rastreio/BRK00000002BR
+Authorization: Bearer {{tokenAdmin}}
+
+### 7.5 Atualizar entrega COMPLETA (PUT - admin)
+PUT {{host}}/entregas/1
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "EM_TRANSITO",
+  "tipo": "FISICA",
+  "codigo_rastreio": "BRK00000001BR",
+  "transportadora": "Breck Log",
+  "cep": "04538133",
+  "logradouro": "Avenida Brigadeiro Faria Lima",
+  "numero": "3477",
+  "bairro": "Itaim Bibi",
+  "cidade": "Sao Paulo",
+  "uf": "SP"
+}
+
+### 7.6 Atualizar entrega PARCIAL (PATCH - admin)
+PATCH {{host}}/entregas/1
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "ENTREGUE"
+}
+
+### 7.7 Status invalido -> 400
+PATCH {{host}}/entregas/1
+Authorization: Bearer {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+  "status": "VOANDO"
+}
+
+### 7.8 Entregas sem token -> 401
+GET {{host}}/entregas
+
+
+###############################################################
+# 8. RELATORIOS  (somente ADMIN - alimentam os graficos)
+###############################################################
+
+### 8.1 Relatorio de vendas (faturamento mensal + categorias + top produtos)
+GET {{host}}/relatorios/vendas
+Authorization: Bearer {{tokenAdmin}}
+
+### 8.2 Relatorio de vendas com filtro de periodo
+GET {{host}}/relatorios/vendas?de=2026-01-01&ate=2026-12-31
+Authorization: Bearer {{tokenAdmin}}
+
+### 8.3 Relatorio de estoque (posicao, valor imobilizado e alertas)
+GET {{host}}/relatorios/estoque
+Authorization: Bearer {{tokenAdmin}}
+
+### 8.4 Relatorio de entregas
+GET {{host}}/relatorios/entregas
+Authorization: Bearer {{tokenAdmin}}
+
+### 8.5 Relatorio como CLIENTE -> 403
+GET {{host}}/relatorios/vendas
+Authorization: Bearer {{tokenCliente}}
+
+### 8.6 Relatorio sem token -> 401
+GET {{host}}/relatorios/vendas
+
+
+###############################################################
+# 9. ERROS GERAIS
+###############################################################
+
+### 9.1 Rota inexistente -> 404
+GET {{host}}/rota-que-nao-existe
+
+### 9.2 Token malformado -> 401
+GET {{host}}/usuarios/perfil
+Authorization: Bearer token-invalido
+
+### 9.3 JSON malformado -> 400
+POST {{host}}/login
+Content-Type: {{contentType}}
+
+{ "email": "admin@breckbarber.com", "senha": }

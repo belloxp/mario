@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carrinho | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="container">
+    <section class="secao">
+      <div class="secao__cabecalho">
+        <div>
+          <span class="secao__etiqueta">Balcao</span>
+          <h2>Seu carrinho</h2>
+          <p>Os itens ficam salvos no LocalStorage deste navegador, mesmo sem login.</p>
+        </div>
+        <button class="btn btn--perigo btn--pequeno" id="btnLimpar">Esvaziar carrinho</button>
+      </div>
+
+      <div class="aviso aviso--erro" id="avisoCarrinho" hidden></div>
+      <div class="aviso aviso--info" id="avisoLogin" hidden></div>
+
+      <div class="carrinho-layout" id="layoutCarrinho">
+        <div class="painel" style="padding:0" id="listaItens"></div>
+
+        <aside class="painel resumo">
+          <h3>Resumo do pedido</h3>
+          <p class="painel__sub">Previa calculada com as mesmas regras do backend.</p>
+
+          <div class="resumo__linha"><span>Itens (<span id="totalUnidades">0</span>)</span><strong id="valorSubtotal">R$ 0,00</strong></div>
+          <div class="resumo__linha resumo__linha--desconto"><span>Desconto (<span id="percentualDesconto">0</span>%)</span><strong id="valorDesconto">- R$ 0,00</strong></div>
+          <div class="resumo__linha"><span>Frete</span><strong id="valorFrete">R$ 0,00</strong></div>
+
+          <div class="resumo__total"><span>Total</span><span id="valorTotal">R$ 0,00</span></div>
+
+          <div style="margin-top:18px;display:grid;gap:10px">
+            <div class="campo">
+              <label for="formaPagamento">Forma de pagamento</label>
+              <select id="formaPagamento">
+                <option value="PIX">PIX</option>
+                <option value="CARTAO">Cartao de credito</option>
+                <option value="BOLETO">Boleto bancario</option>
+              </select>
+            </div>
+            <button class="btn btn--primario btn--bloco" id="btnFinalizar">Finalizar pedido</button>
+            <a href="produtos.html" class="btn btn--contorno btn--bloco">Continuar comprando</a>
+          </div>
+
+          <div class="regras-desconto" id="caixaRegras">
+            <strong>Regras de desconto aplicadas</strong>
+            <ul id="listaRegras"><li>Sem desconto aplicavel ate o momento.</li></ul>
+          </div>
+
+          <div class="regras-desconto regras-desconto--secundario">
+            <strong>Tabela vigente</strong>
+            <ul>
+              <li>5% acima de R$ 150,00</li>
+              <li>10% acima de R$ 300,00</li>
+              <li>15% acima de R$ 600,00</li>
+              <li>+5% para 10 ou mais unidades (teto de 20%)</li>
+              <li>Frete gratis acima de R$ 199,00</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (function telaCarrinho() {
+      UI.montarCabecalho('');
+      UI.montarRodape();
+
+      const elLista = document.getElementById('listaItens');
+      const elLayout = document.getElementById('layoutCarrinho');
+
+      function renderizar() {
+        const itens = Carrinho.itens();
+
+        if (!itens.length) {
+          elLayout.style.display = 'block';
+          elLista.innerHTML = `
+            <div class="vazio">
+              <div class="vazio__icone">${UI.icone('carrinho', 36)}</div>
+              <h3 style="margin:0 0 6px">Seu carrinho esta vazio</h3>
+              <p style="margin:0 0 18px">Escolha pomadas, itens de barba, ferramentas ou um vale-presente.</p>
+              <a href="produtos.html" class="btn btn--primario">Ver a loja</a>
+            </div>`;
+          document.querySelector('.resumo').style.display = 'none';
+          atualizarResumo();
+          return;
+        }
+
+        elLayout.style.display = '';
+        document.querySelector('.resumo').style.display = '';
+
+        elLista.innerHTML = itens.map((i) => {
+          const limite = i.estoque_disponivel;
+          return `
+            <div class="item-carrinho">
+              <img src="${escapar(i.imagem || UI.IMAGEM_FALLBACK)}" alt="" ${UI.onErroImagem}>
+              <div>
+                <p class="item-carrinho__nome">${escapar(i.nome)}</p>
+                <span class="item-carrinho__meta">
+                  ${escapar(i.codigo)} &middot; ${escapar(i.categoria || '')} &middot; ${moeda(i.preco)} cada
+                  ${limite ? ` &middot; estoque: ${limite}` : ''}
+                </span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+                <strong style="color:var(--acento);font-size:1.05rem">${moeda(i.preco * i.quantidade)}</strong>
+                <div class="quantidade">
+                  <button type="button" data-menos="${i.produto_id}">-</button>
+                  <span>${i.quantidade}</span>
+                  <button type="button" data-mais="${i.produto_id}">+</button>
+                </div>
+                <button class="btn btn--perigo btn--pequeno" data-remover="${i.produto_id}">Remover</button>
+              </div>
+            </div>`;
+        }).join('');
+
+        elLista.querySelectorAll('[data-menos]').forEach((b) =>
+          b.addEventListener('click', () => aplicar(Carrinho.alterarQuantidade(b.dataset.menos, -1))));
+
+        elLista.querySelectorAll('[data-mais]').forEach((b) =>
+          b.addEventListener('click', () => aplicar(Carrinho.alterarQuantidade(b.dataset.mais, +1))));
+
+        elLista.querySelectorAll('[data-remover]').forEach((b) =>
+          b.addEventListener('click', () => aplicar(Carrinho.remover(b.dataset.remover))));
+
+        atualizarResumo();
+      }
+
+      function aplicar(resultado) {
+        if (!resultado.ok) {
+          UI.aviso(resultado.mensagem, 'erro');
+          alert(resultado.mensagem);
+          return;
+        }
+        if (resultado.mensagem) UI.aviso(resultado.mensagem, 'info');
+        renderizar();
+      }
+
+      function atualizarResumo() {
+        const t = Carrinho.calcularTotais();
+        document.getElementById('totalUnidades').textContent = t.unidades;
+        document.getElementById('valorSubtotal').textContent = moeda(t.subtotal);
+        document.getElementById('percentualDesconto').textContent = t.percentual;
+        document.getElementById('valorDesconto').textContent = `- ${moeda(t.desconto)}`;
+        document.getElementById('valorFrete').textContent = t.frete === 0 ? (t.apenasDigital ? 'Digital' : 'Gratis') : moeda(t.frete);
+        document.getElementById('valorTotal').textContent = moeda(t.total);
+
+        document.getElementById('listaRegras').innerHTML = t.regras.length
+          ? t.regras.map((r) => `<li>${escapar(r)}</li>`).join('')
+          : '<li>Sem desconto aplicavel ate o momento.</li>';
+
+        document.getElementById('btnFinalizar').disabled = t.unidades === 0;
+      }
+
+      document.getElementById('btnLimpar').addEventListener('click', () => {
+        if (!Carrinho.itens().length) return;
+        if (confirm('Remover todos os itens do carrinho?')) { Carrinho.limpar(); renderizar(); }
+      });
+
+      // ---- Checkout: rota privada, exige login ----
+      document.getElementById('btnFinalizar').addEventListener('click', async () => {
+        UI.mensagem('avisoCarrinho', '');
+
+        if (!Carrinho.itens().length) return;
+
+        if (!Auth.logado()) {
+          UI.mensagem('avisoLogin', 'Para converter o carrinho em pedido e preciso estar logado. Redirecionando para o login...', 'info');
+          setTimeout(() => { window.location.href = 'login.html?redirecionar=carrinho.html'; }, 1400);
+          return;
+        }
+
+        const botao = document.getElementById('btnFinalizar');
+        botao.disabled = true;
+        botao.textContent = 'Processando...';
+
+        try {
+          const pedido = await API.finalizarPedido({
+            itens: Carrinho.paraPedido(),
+            forma_pagamento: document.getElementById('formaPagamento').value,
+          });
+
+          Carrinho.limpar();
+          UI.aviso(`Pedido ${pedido.codigo} confirmado!`, 'ok', 5000);
+          window.location.href = `meus-pedidos.html?novo=${encodeURIComponent(pedido.codigo)}`;
+        } catch (e) {
+          let texto = e.message;
+
+          // O backend devolve a lista de itens sem estoque em detalhes.indisponiveis.
+          if (e.detalhes?.indisponiveis?.length) {
+            texto += ' ' + e.detalhes.indisponiveis
+              .map((i) => `${i.nome}: ${i.motivo}${i.disponivel !== undefined ? ` (disponivel: ${i.disponivel})` : ''}`)
+              .join(' | ');
+          }
+
+          UI.mensagem('avisoCarrinho', texto);
+          alert(texto);
+        } finally {
+          botao.disabled = false;
+          botao.textContent = 'Finalizar pedido';
+          atualizarResumo();
+        }
+      });
+
+      if (!Auth.logado()) {
+        UI.mensagem('avisoLogin', 'Voce pode montar o carrinho sem login. O acesso so e exigido na hora de fechar o pedido.', 'info');
+      }
+
+      renderizar();
+    })();
+  </script>
+</body>
+</html>

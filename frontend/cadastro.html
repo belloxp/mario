@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar conta | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="entrada entrada--larga">
+    <div class="entrada__caixa">
+
+      <header class="entrada__topo">
+        <img src="img/logo.png" alt="Breck Barber" class="entrada__logo">
+        <h1>Criar sua conta</h1>
+        <p>
+          O CPF e conferido pela formula dos digitos verificadores e o endereco e
+          preenchido automaticamente pelo ViaCEP.
+        </p>
+      </header>
+
+      <div class="aviso aviso--erro" id="avisoCadastro" hidden></div>
+
+      <form id="formCadastro" novalidate>
+
+        <h4 class="form-titulo-secao" style="margin-top:0">Dados pessoais</h4>
+        <div class="form-grade">
+          <div class="campo span-2">
+            <label for="nome">Nome completo *</label>
+            <input type="text" id="nome" autocomplete="name" placeholder="Como no documento" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="cpf">CPF *</label>
+            <input type="text" id="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="telefone">Telefone</label>
+            <input type="text" id="telefone" inputmode="numeric" placeholder="(00) 00000-0000" maxlength="15">
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="email">E-mail *</label>
+            <input type="email" id="email" autocomplete="email" placeholder="voce@email.com" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="senha">Senha * <small>(minimo 6 caracteres)</small></label>
+            <input type="password" id="senha" autocomplete="new-password" placeholder="Crie uma senha" required>
+            <span class="campo__erro"></span>
+          </div>
+        </div>
+
+        <h4 class="form-titulo-secao">Endereco de entrega</h4>
+        <div class="form-grade">
+          <div class="campo">
+            <label for="cep">CEP *</label>
+            <input type="text" id="cep" inputmode="numeric" placeholder="00000-000" maxlength="9" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="numero">Numero *</label>
+            <input type="text" id="numero" placeholder="123" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo span-2">
+            <label for="logradouro">Rua / logradouro *</label>
+            <input type="text" id="logradouro" placeholder="Preenchido pelo ViaCEP" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="bairro">Bairro *</label>
+            <input type="text" id="bairro" placeholder="Preenchido pelo ViaCEP" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="complemento">Complemento</label>
+            <input type="text" id="complemento" placeholder="Apto, bloco, referencia">
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="cidade">Cidade *</label>
+            <input type="text" id="cidade" placeholder="Preenchido pelo ViaCEP" required>
+            <span class="campo__erro"></span>
+          </div>
+
+          <div class="campo">
+            <label for="uf">UF *</label>
+            <input type="text" id="uf" maxlength="2" placeholder="SC" required>
+            <span class="campo__erro"></span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn--primario btn--bloco" id="btnCadastrar" style="margin-top:22px">
+          Criar conta
+        </button>
+      </form>
+
+      <p class="entrada__troca">
+        Ja tem cadastro? <a href="login.html">Fazer login</a>
+      </p>
+    </div>
+
+    <ul class="entrada__pontos">
+      <li><strong>CPF conferido na hora</strong> validacao matematica pelos digitos verificadores.</li>
+      <li><strong>Endereco automatico</strong> digite o CEP e o ViaCEP preenche o resto.</li>
+      <li><strong>Senha criptografada</strong> hash bcrypt, nunca armazenada em texto puro.</li>
+    </ul>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/validacoes.js"></script>
+  <script>
+    (function telaCadastro() {
+      UI.montarCabecalho('cadastro');
+      UI.montarRodape();
+
+      if (Auth.logado()) { window.location.href = 'index.html'; return; }
+
+      Validar.ligarMascara('cpf', Validar.mascaraCPF);
+      Validar.ligarMascara('cep', Validar.mascaraCEP);
+      Validar.ligarMascara('telefone', Validar.mascaraTelefone);
+
+      document.getElementById('uf').addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2);
+      });
+
+      // ---- Validacao do CPF em tempo real ----
+      const elCpf = document.getElementById('cpf');
+      elCpf.addEventListener('blur', () => {
+        const bruto = Validar.digitos(elCpf.value);
+        if (!bruto) { Validar.marcarErro('cpf', ''); return; }
+        Validar.marcarErro('cpf', Validar.cpf(bruto) ? '' : 'CPF invalido pelos digitos verificadores.');
+      });
+
+      // ---- Autocompletar de endereco pelo ViaCEP ----
+      ViaCep.ligar(
+        { cep: 'cep', logradouro: 'logradouro', bairro: 'bairro', cidade: 'cidade', uf: 'uf', numero: 'numero' },
+        (mensagem, tipo) => UI.aviso(mensagem, tipo === 'ok' ? 'ok' : tipo === 'erro' ? 'erro' : 'info', 2600)
+      );
+
+      document.getElementById('formCadastro').addEventListener('submit', async (evento) => {
+        evento.preventDefault();
+        UI.mensagem('avisoCadastro', '');
+
+        const valor = (id) => document.getElementById(id).value.trim();
+        ['nome', 'cpf', 'email', 'senha', 'cep', 'numero', 'logradouro', 'bairro', 'cidade', 'uf']
+          .forEach((id) => Validar.marcarErro(id, ''));
+
+        const erros = [];
+
+        if (valor('nome').length < 3) { Validar.marcarErro('nome', 'Informe o nome completo.'); erros.push('nome'); }
+        if (!Validar.cpf(valor('cpf'))) { Validar.marcarErro('cpf', 'CPF invalido pelos digitos verificadores.'); erros.push('cpf'); }
+        if (!Validar.email(valor('email'))) { Validar.marcarErro('email', 'E-mail invalido.'); erros.push('email'); }
+        if (valor('senha').length < 6) { Validar.marcarErro('senha', 'Minimo de 6 caracteres.'); erros.push('senha'); }
+        if (Validar.digitos(valor('cep')).length !== 8) { Validar.marcarErro('cep', 'CEP deve ter 8 digitos.'); erros.push('cep'); }
+
+        ['numero', 'logradouro', 'bairro', 'cidade'].forEach((id) => {
+          if (!valor(id)) { Validar.marcarErro(id, 'Campo obrigatorio.'); erros.push(id); }
+        });
+        if (valor('uf').length !== 2) { Validar.marcarErro('uf', 'Use a sigla com 2 letras.'); erros.push('uf'); }
+
+        if (erros.length) {
+          UI.mensagem('avisoCadastro', 'Corrija os campos destacados para continuar.');
+          document.getElementById(erros[0]).focus();
+          return;
+        }
+
+        const botao = document.getElementById('btnCadastrar');
+        botao.disabled = true;
+        botao.textContent = 'Cadastrando...';
+
+        try {
+          await API.cadastrarUsuario({
+            nome: valor('nome'),
+            email: valor('email'),
+            senha: valor('senha'),
+            cpf: Validar.digitos(valor('cpf')),
+            telefone: valor('telefone') || null,
+            cep: Validar.digitos(valor('cep')),
+            logradouro: valor('logradouro'),
+            numero: valor('numero'),
+            complemento: valor('complemento') || null,
+            bairro: valor('bairro'),
+            cidade: valor('cidade'),
+            uf: valor('uf'),
+          });
+
+          // Login automatico logo apos o cadastro.
+          const sessao = await API.login(valor('email'), valor('senha'));
+          Auth.iniciar(sessao.token, sessao.usuario);
+
+          UI.aviso('Conta criada com sucesso!', 'ok');
+          setTimeout(() => {
+            window.location.href = Carrinho.quantidadeTotal() > 0 ? 'carrinho.html' : 'index.html';
+          }, 700);
+        } catch (e) {
+          UI.mensagem('avisoCadastro', e.message);
+
+          // Destaca o campo apontado pelo backend, quando houver.
+          if (/e-mail/i.test(e.message)) Validar.marcarErro('email', 'Ja cadastrado.');
+          if (/cpf/i.test(e.message)) Validar.marcarErro('cpf', 'Ja cadastrado ou invalido.');
+
+          botao.disabled = false;
+          botao.textContent = 'Criar conta';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

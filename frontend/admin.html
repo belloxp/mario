@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestao da barbearia | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="container">
+    <section class="secao">
+      <div class="secao__cabecalho">
+        <div>
+          <span class="secao__etiqueta">Area restrita</span>
+          <h2>Gestao da barbearia</h2>
+          <p>Cadastro de produtos, movimentacao de estoque, pedidos e relatorios do balcao.</p>
+        </div>
+      </div>
+
+      <!-- Menu lateral fixo a esquerda, conteudo da secao a direita -->
+      <div class="painel-admin">
+        <aside class="painel-admin__lateral">
+          <span class="painel-admin__rotulo">Secoes</span>
+          <div class="abas">
+            <button class="aba ativa" data-aba="produtos">Produtos</button>
+            <button class="aba" data-aba="estoque">Estoque</button>
+            <button class="aba" data-aba="pedidos">Pedidos</button>
+            <button class="aba" data-aba="relatorios">Relatorios</button>
+          </div>
+        </aside>
+
+        <div class="painel-admin__conteudo">
+
+      <div class="aviso aviso--erro" id="avisoAdmin" hidden></div>
+      <div class="aviso aviso--ok" id="sucessoAdmin" hidden></div>
+
+      <!-- ==================== PRODUTOS ==================== -->
+      <div class="aba-conteudo ativa" id="aba-produtos">
+        <div class="painel">
+          <h3 id="tituloFormProduto">Cadastrar novo produto</h3>
+          <p class="painel__sub">POST /produtos para criar, PUT /produtos/:id para atualizar o registro completo.</p>
+
+          <form id="formProduto" novalidate>
+            <input type="hidden" id="produtoId">
+
+            <div class="form-grade">
+              <div class="campo">
+                <label for="codigo">Codigo *</label>
+                <input type="text" id="codigo" placeholder="POM-010" required>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="preco">Preco (R$) *</label>
+                <input type="number" id="preco" step="0.01" min="0.01" placeholder="74.90" required>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo span-2">
+                <label for="nomeProduto">Nome *</label>
+                <input type="text" id="nomeProduto" placeholder="Ex.: Pomada Modeladora Efeito Matte 150g" required>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="categoriaId">Categoria *</label>
+                <select id="categoriaId" required></select>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="tipoProduto">Tipo *</label>
+                <select id="tipoProduto">
+                  <option value="COSMETICO">Cuidado de cabelo e barba</option>
+                  <option value="FERRAMENTA">Ferramenta de barbeiro</option>
+                  <option value="DIGITAL">Curso e vale-presente</option>
+                </select>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="linha">Linha</label>
+                <input type="text" id="linha" placeholder="Cabelo, Barba, Maquinas, Navalhas...">
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="finalidade">Finalidade</label>
+                <input type="text" id="finalidade" placeholder="Fixacao forte, Hidratacao, Acabamento...">
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="marca">Marca</label>
+                <input type="text" id="marca" placeholder="Breck">
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="quantidadeEstoque">Estoque inicial</label>
+                <input type="number" id="quantidadeEstoque" min="0" value="0">
+                <small>Ignorado ao editar um produto ja existente.</small>
+              </div>
+
+              <div class="campo span-2">
+                <label for="imagem">URL da imagem</label>
+                <input type="url" id="imagem" placeholder="https://...">
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo span-2">
+                <label for="descricao">Descricao</label>
+                <textarea id="descricao" rows="3" placeholder="Descricao comercial do produto"></textarea>
+              </div>
+
+              <div class="campo span-2">
+                <label for="especificacoes">Especificacoes (JSON)</label>
+                <textarea id="especificacoes" rows="4" placeholder='{"peso_g":150,"fixacao":"Forte (4/5)","aroma":"Amadeirado"}'></textarea>
+                <small>Composicao, ficha tecnica da ferramenta ou conteudo do curso, conforme o tipo.</small>
+                <span class="campo__erro"></span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+              <button type="submit" class="btn btn--primario" id="btnSalvarProduto">Cadastrar produto</button>
+              <button type="button" class="btn btn--contorno" id="btnCancelarEdicao" style="display:none">Cancelar edicao</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="painel">
+          <h3>Produtos cadastrados</h3>
+          <p class="painel__sub">PATCH atualiza so o preco. DELETE remove (ou desativa, se houver vendas).</p>
+
+          <div class="campo" style="max-width:340px;margin-bottom:14px">
+            <label for="buscaAdminProduto">Filtrar</label>
+            <input type="search" id="buscaAdminProduto" placeholder="Codigo ou nome">
+          </div>
+
+          <div class="tabela-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th><th>Produto</th><th>Categoria</th><th>Tipo</th>
+                  <th class="numero">Preco</th><th class="numero">Estoque</th><th>Situacao</th><th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody id="corpoAdminProdutos"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== ESTOQUE ==================== -->
+      <div class="aba-conteudo" id="aba-estoque">
+        <div class="painel">
+          <h3>Movimentacao de estoque</h3>
+          <p class="painel__sub">POST /estoque registra entrada, saida ou ajuste do saldo.</p>
+
+          <form id="formEstoque" novalidate>
+            <div class="form-grade">
+              <div class="campo span-2">
+                <label for="estoqueProduto">Produto *</label>
+                <select id="estoqueProduto" required></select>
+                <span class="campo__erro"></span>
+              </div>
+
+              <div class="campo">
+                <label for="estoqueTipo">Movimento *</label>
+                <select id="estoqueTipo">
+                  <option value="ENTRADA">Entrada (somar)</option>
+                  <option value="SAIDA">Saida (subtrair)</option>
+                  <option value="AJUSTE">Ajuste (definir saldo)</option>
+                </select>
+              </div>
+
+              <div class="campo">
+                <label for="estoqueQuantidade">Quantidade *</label>
+                <input type="number" id="estoqueQuantidade" min="0" value="1" required>
+                <span class="campo__erro"></span>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn--primario" style="margin-top:18px" id="btnMovimentar">
+              Registrar movimentacao
+            </button>
+          </form>
+        </div>
+
+        <div class="painel">
+          <h3>Posicao atual</h3>
+          <p class="painel__sub">Itens esgotados e criticos aparecem primeiro.</p>
+
+          <div class="kpis" id="kpisEstoque"></div>
+
+          <div class="tabela-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th><th>Produto</th><th>Categoria</th>
+                  <th class="numero">Saldo</th><th class="numero">Minimo</th>
+                  <th class="numero">Valor imobilizado</th><th>Situacao</th><th>Ajuste rapido</th>
+                </tr>
+              </thead>
+              <tbody id="corpoEstoque"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PEDIDOS ==================== -->
+      <div class="aba-conteudo" id="aba-pedidos">
+        <div class="painel">
+          <h3>Pedidos recebidos</h3>
+          <p class="painel__sub">PATCH /pedidos/:id avanca o status. DELETE cancela e estorna o estoque.</p>
+
+          <div class="campo" style="max-width:280px;margin-bottom:14px">
+            <label for="filtroStatusPedido">Status</label>
+            <select id="filtroStatusPedido">
+              <option value="">Todos</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="PAGO">Pago</option>
+              <option value="ENVIADO">Enviado</option>
+              <option value="CONCLUIDO">Concluido</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+          </div>
+
+          <div class="tabela-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pedido</th><th>Cliente</th><th>Data</th>
+                  <th class="numero">Itens</th><th class="numero">Total</th>
+                  <th>Status</th><th>Entrega</th><th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody id="corpoPedidos"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== RELATORIOS ==================== -->
+      <div class="aba-conteudo" id="aba-relatorios">
+        <div class="painel" style="margin-bottom:18px">
+          <h3>Filtro de periodo</h3>
+          <p class="painel__sub">Aplica-se ao relatorio de vendas (GET /relatorios/vendas).</p>
+          <div class="form-grade">
+            <div class="campo"><label for="periodoDe">De</label><input type="date" id="periodoDe"></div>
+            <div class="campo"><label for="periodoAte">Ate</label><input type="date" id="periodoAte"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn--primario" id="btnAplicarPeriodo">Aplicar</button>
+            <button class="btn btn--contorno" id="btnLimparPeriodo">Limpar</button>
+          </div>
+        </div>
+
+        <div class="kpis" id="kpisRelatorio"></div>
+
+        <div class="graficos">
+          <div class="grafico-caixa">
+            <h4>Relatorio 1 &mdash; Faturamento mensal</h4>
+            <p>Receita e volume de pedidos por competencia (GET /relatorios/vendas).</p>
+            <div class="grafico-caixa__tela"><canvas id="graficoFaturamento"></canvas></div>
+          </div>
+
+          <div class="grafico-caixa">
+            <h4>Relatorio 2 &mdash; Vendas por prateleira</h4>
+            <p>Participacao de cada categoria da barbearia no faturamento.</p>
+            <div class="grafico-caixa__tela"><canvas id="graficoCategorias"></canvas></div>
+          </div>
+        </div>
+
+        <div class="graficos" style="margin-top:18px">
+          <div class="grafico-caixa">
+            <h4>Valor imobilizado em estoque</h4>
+            <p>Cruzamento da movimentacao de estoque por categoria (GET /relatorios/estoque).</p>
+            <div class="grafico-caixa__tela"><canvas id="graficoEstoque"></canvas></div>
+          </div>
+
+          <div class="grafico-caixa">
+            <h4>Top produtos vendidos</h4>
+            <p>Ranking por unidades no periodo selecionado.</p>
+            <div class="tabela-wrap" style="border:none;background:transparent">
+              <table>
+                <thead><tr><th>Produto</th><th class="numero">Unidades</th><th class="numero">Faturamento</th></tr></thead>
+                <tbody id="corpoTopProdutos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="painel" style="margin-top:18px">
+          <h3>Alertas de reposicao</h3>
+          <p class="painel__sub">Itens esgotados ou no limite minimo.</p>
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Codigo</th><th>Produto</th><th>Categoria</th><th class="numero">Saldo</th><th class="numero">Minimo</th><th>Situacao</th></tr></thead>
+              <tbody id="corpoAlertas"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

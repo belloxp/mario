@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Breck Barber | Produtos de barbeiro para cabelo e barba</title>
+  <meta name="description" content="Pomadas, oleos de barba, shampoos, maquinas, navalhas e acessorios de barbearia. A mesma linha que usamos na cadeira da Breck, em Tijucas, entregue na sua casa.">
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main>
+
+    <!-- Capa: coluna unica, com o logo aplicado em marca d'agua -->
+    <section class="capa">
+      <div class="container capa__interno">
+        <span class="hero__selo">Loja oficial da cadeira</span>
+
+        <h1 class="capa__titulo">
+          O que o barbeiro usa,<br>
+          agora na sua <span class="gradiente">bancada</span>.
+        </h1>
+
+        <p class="capa__texto">
+          Pomadas de fixacao, oleos e balms de barba, shampoos para o couro cabeludo,
+          maquinas, navalhas e tudo o que sustenta um corte bem feito. A mesma linha
+          que passa pela cadeira da Breck, com estoque conferido em tempo real.
+        </p>
+
+        <div class="capa__acoes">
+          <a href="produtos.html" class="btn btn--primario">Ver a loja completa</a>
+          <a href="produtos.html?categoria=barba-e-bigode" class="btn btn--contorno">Linha de barba</a>
+        </div>
+      </div>
+
+      <!-- Indicadores em regua, atravessando a largura da capa -->
+      <div class="capa__regua">
+        <div class="container capa__numeros">
+          <div class="capa__numero"><strong id="numProdutos">0</strong><span>Produtos</span></div>
+          <div class="capa__numero"><strong id="numCategorias">0</strong><span>Categorias</span></div>
+          <div class="capa__numero"><strong id="numLinhas">0</strong><span>Linhas</span></div>
+          <div class="capa__numero"><strong id="numDesconto">0</strong><span>Desconto maximo</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <!-- Vantagens em faixa horizontal -->
+      <section class="vantagens revelar">
+        <article class="vantagem">
+          <span class="vantagem__icone" id="iconeFrete"></span>
+          <div>
+            <strong>Frete gratis acima de R$ 199</strong>
+            <span>Para todo o Brasil, em pedidos com produtos fisicos.</span>
+          </div>
+        </article>
+        <article class="vantagem">
+          <span class="vantagem__icone" id="iconeDesconto"></span>
+          <div>
+            <strong>Ate 20% de desconto progressivo</strong>
+            <span>Quanto maior o pedido, maior a faixa aplicada no checkout.</span>
+          </div>
+        </article>
+        <article class="vantagem">
+          <span class="vantagem__icone" id="iconePresente"></span>
+          <div>
+            <strong>Vale-presente na hora</strong>
+            <span>Codigo enviado por e-mail assim que o pedido e confirmado.</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- Faixa rolante com o jeito da casa -->
+      <div class="faixa">
+        <div class="faixa__trilho" id="faixaTrilho"></div>
+      </div>
+
+      <!-- Categorias em indice numerado -->
+      <section class="secao revelar">
+        <div class="secao__cabecalho">
+          <div>
+            <span class="secao__etiqueta">Prateleiras</span>
+            <h2>Escolha pelo que voce precisa hoje</h2>
+            <p>Do finalizador do topo a lamina do acabamento, cada prateleira em um clique.</p>
+          </div>
+        </div>
+        <div class="indice" id="tilesCategorias"></div>
+      </section>
+
+      <!-- Vitrine: carrega automaticamente ao abrir a tela -->
+      <section class="secao revelar">
+        <div class="secao__cabecalho">
+          <div>
+            <span class="secao__etiqueta">Selecao do barbeiro</span>
+            <h2>Novidades da bancada</h2>
+            <p>Carregado direto da API assim que a pagina abre.</p>
+          </div>
+          <a href="produtos.html" class="btn btn--contorno btn--pequeno">Ver todos</a>
+        </div>
+
+        <div class="aviso aviso--erro" id="avisoVitrine" hidden></div>
+        <div class="grade-produtos" id="gradeDestaques"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (async function iniciarVitrine() {
+      UI.montarCabecalho('vitrine');
+      UI.montarRodape();
+      UI.esqueletos('gradeDestaques', 8);
+
+      // Icones da faixa de vantagens.
+      document.getElementById('iconeFrete').innerHTML = UI.icone('frete', 22);
+      document.getElementById('iconeDesconto').innerHTML = UI.icone('etiqueta', 22);
+      document.getElementById('iconePresente').innerHTML = UI.icone('presente', 22);
+
+      // Faixa rolante (duplicada para o loop ficar continuo).
+      const DIFERENCIAIS = [
+        ['Pomada', 'matte, brilho e textura'],
+        ['Barba', 'oleo, balm e pos-barba'],
+        ['Navalha', 'fio limpo a cada cliente'],
+        ['Maquinas', 'degrade sem falha'],
+        ['Estoque', 'conferido em tempo real'],
+        ['Checkout', 'com desconto progressivo'],
+      ];
+      const itens = DIFERENCIAIS.map(([b, t]) => `<span class="faixa__item"><b>${b}</b> ${t}</span>`).join('');
+      document.getElementById('faixaTrilho').innerHTML = itens + itens;
+
+      // Categorias (rota publica) -> indice numerado
+      let totalCategorias = 0;
+      try {
+        const categorias = await API.listarCategorias();
+        totalCategorias = categorias.length;
+
+        document.getElementById('tilesCategorias').innerHTML = categorias.map((c, i) => `
+          <a class="indice__item" href="produtos.html?categoria=${encodeURIComponent(c.slug)}">
+            <span class="indice__num">${String(i + 1).padStart(2, '0')}</span>
+            <span class="indice__icone">${UI.icone(c.icone, 22)}</span>
+            <span class="indice__nome">${escapar(c.nome)}</span>
+            <span class="indice__contagem">${Number(c.total_produtos || 0)} produto(s)</span>
+            <span class="indice__seta">${UI.icone('seta', 18)}</span>
+          </a>`).join('');
+      } catch (e) {
+        document.getElementById('tilesCategorias').innerHTML =
+          '<span style="color:var(--texto-suave);font-size:.85rem">Categorias indisponiveis no momento.</span>';
+      }
+
+      // Produtos em destaque (rota publica)
+      try {
+        const produtos = await API.listarProdutos({ ordenar: 'recentes' });
+        const destaques = produtos.slice(0, 8);
+
+        // Contadores animados da capa.
+        const linhas = new Set(produtos.map((p) => p.linha).filter(Boolean));
+        UI.contar('numProdutos', produtos.length);
+        UI.contar('numCategorias', totalCategorias);
+        UI.contar('numLinhas', linhas.size);
+        UI.contar('numDesconto', CONFIG.TETO_PERCENTUAL, 900, '%');
+
+        if (!destaques.length) {
+          UI.vazio('gradeDestaques', 'caixa', 'Nenhum produto cadastrado ainda', 'Rode "npm run seed" no backend para carregar o catalogo inicial.');
+          return;
+        }
+
+        document.getElementById('gradeDestaques').innerHTML = destaques.map(UI.cardProduto).join('');
+        UI.ligarBotoesAdicionar('gradeDestaques', destaques);
+      } catch (e) {
+        document.getElementById('gradeDestaques').innerHTML = '';
+        UI.mensagem('avisoVitrine', e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

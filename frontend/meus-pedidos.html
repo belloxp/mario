@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meus pedidos | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="container">
+    <section class="secao">
+      <div class="secao__cabecalho">
+        <div>
+          <span class="secao__etiqueta">Historico</span>
+          <h2>Meus pedidos</h2>
+          <p>Compras, descontos aplicados e status de entrega. Rota privada: GET /pedidos/meus-pedidos.</p>
+        </div>
+        <a href="produtos.html" class="btn btn--contorno btn--pequeno">Comprar novamente</a>
+      </div>
+
+      <div class="aviso aviso--ok" id="avisoNovo" hidden></div>
+      <div class="aviso aviso--erro" id="avisoPedidos" hidden></div>
+
+      <div class="kpis" id="kpisPedidos"></div>
+
+      <div class="tabela-wrap" style="margin-bottom:22px">
+        <table>
+          <thead>
+            <tr>
+              <th>Pedido</th><th>Data</th><th class="numero">Itens</th>
+              <th class="numero">Desconto</th><th class="numero">Total</th>
+              <th>Status</th><th>Entrega</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="corpoTabelaPedidos"></tbody>
+        </table>
+      </div>
+
+      <div id="detalhesPedidos"></div>
+    </section>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (async function telaPedidos() {
+      UI.montarCabecalho('pedidos');
+      UI.montarRodape();
+
+      if (!Auth.protegerPagina()) return;
+
+      const novo = new URLSearchParams(window.location.search).get('novo');
+      if (novo) UI.mensagem('avisoNovo', `Pedido ${novo} registrado com sucesso! O estoque ja foi atualizado.`, 'ok');
+
+      let pedidos = [];
+      try {
+        pedidos = await API.meusPedidos();
+      } catch (e) {
+        UI.mensagem('avisoPedidos', e.message);
+        return;
+      }
+
+      const corpo = document.getElementById('corpoTabelaPedidos');
+
+      if (!pedidos.length) {
+        corpo.innerHTML = `
+          <tr><td colspan="8">
+            <div class="vazio">
+              <div class="vazio__icone">${UI.icone('caixa', 36)}</div>
+              <h3 style="margin:0 0 6px">Nenhum pedido ainda</h3>
+              <p style="margin:0 0 18px">Assim que voce fechar a primeira compra ela aparece aqui.</p>
+              <a href="produtos.html" class="btn btn--primario">Ver a loja</a>
+            </div>
+          </td></tr>`;
+        return;
+      }
+
+      // ---- Indicadores ----
+      const validos = pedidos.filter((p) => p.status !== 'CANCELADO');
+      const total = validos.reduce((s, p) => s + Number(p.total), 0);
+      const economia = validos.reduce((s, p) => s + Number(p.desconto), 0);
+
+      document.getElementById('kpisPedidos').innerHTML = `
+        <div class="kpi"><div class="kpi__rotulo">Pedidos</div><div class="kpi__valor">${pedidos.length}</div><div class="kpi__nota">${validos.length} validos</div></div>
+        <div class="kpi"><div class="kpi__rotulo">Total em compras</div><div class="kpi__valor kpi__valor--acento">${moeda(total)}</div><div class="kpi__nota">Sem contar cancelados</div></div>
+        <div class="kpi"><div class="kpi__rotulo">Economia em descontos</div><div class="kpi__valor">${moeda(economia)}</div><div class="kpi__nota">Regras progressivas aplicadas</div></div>
+        <div class="kpi"><div class="kpi__rotulo">Em transito</div><div class="kpi__valor">${pedidos.filter((p) => p.entrega?.status === 'EM_TRANSITO').length}</div><div class="kpi__nota">Entregas a caminho</div></div>`;
+
+      // ---- Tabela resumo ----
+      corpo.innerHTML = pedidos.map((p) => {
+        const unidades = (p.itens || []).reduce((s, i) => s + i.quantidade, 0);
+        const entrega = p.entrega;
+        return `
+          <tr>
+            <td><strong>${escapar(p.codigo)}</strong></td>
+            <td>${dataHoraBR(p.created_at)}</td>
+            <td class="numero">${unidades}</td>
+            <td class="numero">${Number(p.desconto) > 0 ? `- ${moeda(p.desconto)}` : '-'}</td>
+            <td class="numero"><strong>${moeda(p.total)}</strong></td>
+            <td><span class="tag tag--${UI.corDoStatus(p.status)}">${escapar(p.status)}</span></td>
+            <td>${entrega ? `<span class="tag tag--${UI.corDoStatus(entrega.status)}">${escapar(entrega.status)}</span>` : '-'}</td>
+            <td><a href="#pedido-${p.id}" class="btn btn--contorno btn--pequeno">Detalhes</a></td>
+          </tr>`;
+      }).join('');
+
+      // ---- Cards de detalhe ----
+      document.getElementById('detalhesPedidos').innerHTML = pedidos.map((p) => {
+        const entrega = p.entrega;
+        const itens = (p.itens || []).map((i) => `
+          <tr>
+            <td>
+              <div style="display:flex;gap:10px;align-items:center">
+                <img src="${escapar(i.produto?.imagem || UI.IMAGEM_FALLBACK)}" alt="" ${UI.onErroImagem} style="width:44px;height:44px;border-radius:8px;object-fit:cover">
+                <div>
+                  <div style="font-weight:700">${escapar(i.nome_produto)}</div>
+                  <div style="color:var(--texto-suave);font-size:.78rem">${escapar(i.produto?.categoria?.nome || '')}</div>
+                </div>
+              </div>
+            </td>
+            <td class="numero">${i.quantidade}</td>
+            <td class="numero">${moeda(i.preco_unitario)}</td>
+            <td class="numero"><strong>${moeda(i.subtotal)}</strong></td>
+          </tr>`).join('');
+
+        return `
+          <div class="painel" id="pedido-${p.id}" style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start">
+              <div>
+                <h3>Pedido ${escapar(p.codigo)}</h3>
+                <p class="painel__sub">
+                  ${dataHoraBR(p.created_at)} &middot; ${escapar(p.forma_pagamento)} &middot;
+                  <span class="tag tag--${UI.corDoStatus(p.status)}">${escapar(p.status)}</span>
+                </p>
+              </div>
+              <div style="text-align:right">
+                <div style="color:var(--texto-suave);font-size:.8rem">Total do pedido</div>
+                <div style="font-size:1.5rem;font-weight:800;color:var(--acento)">${moeda(p.total)}</div>
+              </div>
+            </div>
+
+            <div class="tabela-wrap" style="margin-bottom:14px">
+              <table>
+                <thead><tr><th>Produto</th><th class="numero">Qtd</th><th class="numero">Unitario</th><th class="numero">Subtotal</th></tr></thead>
+                <tbody>${itens}</tbody>
+              </table>
+            </div>
+
+            <div class="form-grade">
+              <div>
+                <div class="resumo__linha"><span>Subtotal</span><strong>${moeda(p.subtotal)}</strong></div>
+                <div class="resumo__linha resumo__linha--desconto"><span>Desconto (${Number(p.percentual_desconto)}%)</span><strong>- ${moeda(p.desconto)}</strong></div>
+                <div class="resumo__linha"><span>Frete</span><strong>${Number(p.frete) === 0 ? 'Gratis' : moeda(p.frete)}</strong></div>
+                ${p.regra_desconto ? `<p style="color:var(--texto-suave);font-size:.78rem;margin:8px 0 0">${escapar(p.regra_desconto)}</p>` : ''}
+              </div>
+
+              <div>
+                <div style="font-weight:700;margin-bottom:8px">Entrega</div>
+                ${entrega ? `
+                  <div style="color:var(--texto-suave);font-size:.86rem;line-height:1.7">
+                    <div>Situacao: <span class="tag tag--${UI.corDoStatus(entrega.status)}">${escapar(entrega.status)}</span></div>
+                    <div>Tipo: ${escapar(entrega.tipo)}</div>
+                    ${entrega.codigo_rastreio ? `<div>Rastreio: <strong style="color:var(--texto)">${escapar(entrega.codigo_rastreio)}</strong></div>` : ''}
+                    ${entrega.tipo === 'FISICA' ? `<div>Endereco: ${escapar(entrega.logradouro || '')}, ${escapar(entrega.numero || '')} - ${escapar(entrega.bairro || '')}, ${escapar(entrega.cidade || '')}/${escapar(entrega.uf || '')}</div>` : ''}
+                    <div>Previsao: ${dataBR(entrega.previsao_entrega)}</div>
+                    ${entrega.data_entrega ? `<div>Entregue em: ${dataHoraBR(entrega.data_entrega)}</div>` : ''}
+                  </div>` : '<div style="color:var(--texto-suave)">Sem entrega vinculada.</div>'}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

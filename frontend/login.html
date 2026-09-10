@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="entrada">
+    <div class="entrada__caixa">
+
+      <header class="entrada__topo">
+        <img src="img/logo.png" alt="Breck Barber" class="entrada__logo">
+        <h1>Acessar a conta</h1>
+        <p>Entre para fechar o pedido, acompanhar a entrega e ver seu historico.</p>
+      </header>
+
+      <div class="aviso aviso--erro" id="avisoLogin" hidden></div>
+
+      <form id="formLogin" novalidate>
+        <div class="campo" style="margin-bottom:14px">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" autocomplete="email" placeholder="voce@email.com" required>
+        </div>
+
+        <div class="campo" style="margin-bottom:20px">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" autocomplete="current-password" placeholder="Sua senha" required>
+        </div>
+
+        <button type="submit" class="btn btn--primario btn--bloco" id="btnEntrar">Entrar</button>
+      </form>
+
+      <p class="entrada__troca">
+        Ainda nao tem conta? <a href="cadastro.html">Criar cadastro</a>
+      </p>
+
+      <div class="entrada__demo">
+        <strong>Contas de demonstracao</strong>
+        <span>Admin: admin@breckbarber.com / admin123</span>
+        <span>Cliente: joao.cliente@email.com / cliente123</span>
+      </div>
+    </div>
+
+    <ul class="entrada__pontos">
+      <li><strong>Checkout protegido</strong> o pedido so e gravado com token JWT valido.</li>
+      <li><strong>Historico completo</strong> pedidos, descontos aplicados e rastreio da entrega.</li>
+      <li><strong>Carrinho preservado</strong> o que voce montou sem login continua ali.</li>
+    </ul>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (function telaLogin() {
+      UI.montarCabecalho('login');
+      UI.montarRodape();
+
+      // Ja logado: nao faz sentido ficar nesta tela.
+      if (Auth.logado()) {
+        window.location.href = Auth.admin() ? 'admin.html' : 'index.html';
+        return;
+      }
+
+      const destino = new URLSearchParams(window.location.search).get('redirecionar');
+
+      document.getElementById('formLogin').addEventListener('submit', async (evento) => {
+        evento.preventDefault();
+        UI.mensagem('avisoLogin', '');
+
+        const email = document.getElementById('email').value.trim();
+        const senha = document.getElementById('senha').value;
+
+        if (!email || !senha) {
+          UI.mensagem('avisoLogin', 'Preencha e-mail e senha.');
+          return;
+        }
+
+        const botao = document.getElementById('btnEntrar');
+        botao.disabled = true;
+        botao.textContent = 'Entrando...';
+
+        try {
+          const dados = await API.login(email, senha);
+          Auth.iniciar(dados.token, dados.usuario);
+          UI.aviso(`Bem-vindo(a), ${dados.usuario.nome.split(' ')[0]}!`, 'ok');
+
+          setTimeout(() => {
+            window.location.href = destino ? decodeURIComponent(destino)
+              : dados.usuario.perfil === 'ADMIN' ? 'admin.html' : 'index.html';
+          }, 500);
+        } catch (e) {
+          UI.mensagem('avisoLogin', e.message);
+          botao.disabled = false;
+          botao.textContent = 'Entrar';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

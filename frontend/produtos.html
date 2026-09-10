@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loja | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="container">
+    <section class="secao">
+      <div class="secao__cabecalho">
+        <div>
+          <span class="secao__etiqueta">Catalogo</span>
+          <h2>Produtos da barbearia</h2>
+          <p id="resumoResultados">Carregando produtos...</p>
+        </div>
+        <div class="visao">
+          <button class="visao__btn ativo" id="btnVisaoCards">Cards</button>
+          <button class="visao__btn" id="btnVisaoTabela">Tabela</button>
+        </div>
+      </div>
+
+      <!-- Coluna de filtros a esquerda, resultados a direita -->
+      <div class="catalogo">
+
+        <aside class="catalogo__filtros">
+          <form class="filtros" id="formFiltros">
+            <h3 class="filtros__titulo">Refinar</h3>
+
+            <div class="campo">
+              <label for="filtroBusca">Buscar</label>
+              <input type="search" id="filtroBusca" placeholder="Nome, marca ou linha">
+            </div>
+            <div class="campo">
+              <label for="filtroCategoria">Categoria</label>
+              <select id="filtroCategoria"><option value="">Todas</option></select>
+            </div>
+            <div class="campo">
+              <label for="filtroTipo">Tipo</label>
+              <select id="filtroTipo">
+                <option value="">Todos</option>
+                <option value="COSMETICO">Cuidado de cabelo e barba</option>
+                <option value="FERRAMENTA">Ferramenta de barbeiro</option>
+                <option value="DIGITAL">Curso e vale-presente</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="filtroOrdem">Ordenar por</label>
+              <select id="filtroOrdem">
+                <option value="nome">Nome (A-Z)</option>
+                <option value="preco_asc">Menor preco</option>
+                <option value="preco_desc">Maior preco</option>
+                <option value="recentes">Novidades</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn btn--contorno btn--bloco" id="btnLimpar">Limpar filtros</button>
+          </form>
+        </aside>
+
+        <div class="catalogo__resultado">
+          <div class="aviso aviso--erro" id="avisoCatalogo" hidden></div>
+
+          <div class="grade-produtos" id="gradeProdutos"></div>
+
+          <div class="tabela-wrap" id="tabelaProdutos" style="display:none">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th><th>Produto</th><th>Categoria</th><th>Linha</th>
+                  <th class="numero">Preco</th><th class="numero">Estoque</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="corpoTabelaProdutos"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (function catalogo() {
+      UI.montarCabecalho('catalogo');
+      UI.montarRodape();
+
+      const elGrade = document.getElementById('gradeProdutos');
+      const elTabela = document.getElementById('tabelaProdutos');
+      const elCorpo = document.getElementById('corpoTabelaProdutos');
+      const elResumo = document.getElementById('resumoResultados');
+
+      let produtosCarregados = [];
+      let visao = 'cards';
+      let temporizador = null;
+
+      const parametros = new URLSearchParams(window.location.search);
+
+      async function carregarCategorias() {
+        try {
+          const categorias = await API.listarCategorias();
+          const select = document.getElementById('filtroCategoria');
+          select.innerHTML = '<option value="">Todas</option>' +
+            categorias.map((c) => `<option value="${escapar(c.slug)}">${escapar(c.nome)}</option>`).join('');
+
+          const preSelecionada = parametros.get('categoria');
+          if (preSelecionada) select.value = preSelecionada;
+        } catch (_) { /* filtro segue utilizavel sem a lista */ }
+      }
+
+      function renderizar() {
+        if (!produtosCarregados.length) {
+          elTabela.style.display = 'none';
+          elGrade.style.display = 'grid';
+          UI.vazio('gradeProdutos', 'busca', 'Nenhum produto encontrado', 'Ajuste a busca ou limpe os filtros.');
+          elResumo.textContent = '0 produto encontrado';
+          return;
+        }
+
+        elResumo.textContent = `${produtosCarregados.length} produto(s) encontrado(s)`;
+
+        if (visao === 'cards') {
+          elTabela.style.display = 'none';
+          elGrade.style.display = 'grid';
+          elGrade.innerHTML = produtosCarregados.map(UI.cardProduto).join('');
+          UI.ligarBotoesAdicionar('gradeProdutos', produtosCarregados);
+          return;
+        }
+
+        elGrade.style.display = 'none';
+        elTabela.style.display = 'block';
+        elCorpo.innerHTML = produtosCarregados.map((p) => {
+          const ilimitado = p.estoque?.ilimitado;
+          const qtd = Number(p.estoque?.quantidade ?? 0);
+          const rotulo = ilimitado ? 'Ilimitado' : qtd;
+          const situacao = ilimitado ? 'ILIMITADO' : qtd === 0 ? 'ESGOTADO' : qtd <= 5 ? 'CRITICO' : 'NORMAL';
+          return `
+            <tr>
+              <td>${escapar(p.codigo)}</td>
+              <td><a href="produto.html?id=${p.id}" style="font-weight:700">${escapar(p.nome)}</a></td>
+              <td>${escapar(p.categoria?.nome || '-')}</td>
+              <td>${escapar(p.linha || '-')}</td>
+              <td class="numero">${moeda(p.preco)}</td>
+              <td class="numero"><span class="tag tag--${UI.corDoStatus(situacao)}">${rotulo}</span></td>
+              <td><button class="btn btn--primario btn--pequeno" data-adicionar="${p.id}" ${situacao === 'ESGOTADO' ? 'disabled' : ''}>Adicionar</button></td>
+            </tr>`;
+        }).join('');
+        UI.ligarBotoesAdicionar('tabelaProdutos', produtosCarregados);
+      }
+
+      async function buscar() {
+        UI.mensagem('avisoCatalogo', '');
+        if (visao === 'cards') UI.esqueletos('gradeProdutos', 8);
+
+        const termo = document.getElementById('filtroBusca').value.trim();
+
+        try {
+          if (termo) {
+            // Rota publica de busca por nome.
+            produtosCarregados = await API.buscarProdutos(termo);
+
+            // Filtros de categoria/tipo aplicados sobre o resultado da busca.
+            const categoria = document.getElementById('filtroCategoria').value;
+            const tipo = document.getElementById('filtroTipo').value;
+            if (categoria) produtosCarregados = produtosCarregados.filter((p) => p.categoria?.slug === categoria);
+            if (tipo) produtosCarregados = produtosCarregados.filter((p) => p.tipo === tipo);
+          } else {
+            produtosCarregados = await API.listarProdutos({
+              categoria: document.getElementById('filtroCategoria').value,
+              tipo: document.getElementById('filtroTipo').value,
+              ordenar: document.getElementById('filtroOrdem').value,
+            });
+          }
+        } catch (e) {
+          produtosCarregados = [];
+          // 404 da busca significa "nenhum resultado", nao e falha de sistema.
+          if (e.status !== 404) UI.mensagem('avisoCatalogo', e.message);
+        }
+
+        renderizar();
+      }
+
+      document.getElementById('filtroBusca').addEventListener('input', () => {
+        clearTimeout(temporizador);
+        temporizador = setTimeout(buscar, 380);
+      });
+      ['filtroCategoria', 'filtroTipo', 'filtroOrdem'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', buscar);
+      });
+      document.getElementById('formFiltros').addEventListener('submit', (e) => { e.preventDefault(); buscar(); });
+
+      document.getElementById('btnLimpar').addEventListener('click', () => {
+        document.getElementById('formFiltros').reset();
+        buscar();
+      });
+
+      /** Alterna entre cards e tabela mantendo o botao ativo destacado. */
+      function trocarVisao(nova) {
+        visao = nova;
+        document.getElementById('btnVisaoCards').classList.toggle('ativo', nova === 'cards');
+        document.getElementById('btnVisaoTabela').classList.toggle('ativo', nova === 'tabela');
+        renderizar();
+      }
+
+      document.getElementById('btnVisaoCards').addEventListener('click', () => trocarVisao('cards'));
+      document.getElementById('btnVisaoTabela').addEventListener('click', () => trocarVisao('tabela'));
+
+      (async () => {
+        await carregarCategorias();
+        const termoUrl = parametros.get('busca');
+        if (termoUrl) document.getElementById('filtroBusca').value = termoUrl;
+        await buscar();
+      })();
+    })();
+  </script>
+</body>
+</html>

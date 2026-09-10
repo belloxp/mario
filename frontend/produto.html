@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produto | Breck Barber</title>
+  <link rel="icon" href="img/logo.png" type="image/png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="cabecalho"></div>
+
+  <main class="container">
+    <div class="aviso aviso--erro" id="avisoProduto" hidden></div>
+    <div id="detalheProduto"></div>
+
+    <section class="secao" id="secaoRelacionados" style="display:none">
+      <div class="secao__cabecalho">
+        <div>
+          <span class="secao__etiqueta">Combina com</span>
+          <h2>Da mesma prateleira</h2>
+          <p>Outros itens que costumam sair junto com este.</p>
+        </div>
+      </div>
+      <div class="grade-produtos" id="gradeRelacionados"></div>
+    </section>
+  </main>
+
+  <div id="rodape"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/carrinho.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    (async function detalhe() {
+      UI.montarCabecalho('catalogo');
+      UI.montarRodape();
+
+      const id = new URLSearchParams(window.location.search).get('id');
+      const alvo = document.getElementById('detalheProduto');
+
+      if (!id) {
+        UI.mensagem('avisoProduto', 'Produto nao informado na URL.');
+        return;
+      }
+
+      /** Rotulos amigaveis para as chaves tecnicas do JSON de especificacoes. */
+      const ROTULOS = {
+        // Cosmeticos de cabelo e barba
+        volume_ml: 'Volume (ml)', peso_g: 'Peso (g)', fixacao: 'Fixacao', brilho: 'Brilho',
+        tipo_cabelo: 'Indicado para', tipo_barba: 'Indicado para', tipo_pele: 'Tipo de pele',
+        ingredientes_chave: 'Ingredientes-chave', aroma: 'Aroma', rendimento: 'Rendimento',
+        modo_uso: 'Modo de uso', livre_de: 'Livre de', teste_dermatologico: 'Teste dermatologico',
+        registro: 'Registro',
+        // Ferramentas de barbeiro
+        motor: 'Motor', rotacao_rpm: 'Rotacao (rpm)', autonomia_min: 'Autonomia (minutos)',
+        alimentacao: 'Alimentacao', material: 'Material', material_lamina: 'Material da lamina',
+        material_cabo: 'Material do cabo', material_cerdas: 'Material das cerdas',
+        tamanho: 'Tamanho', dentes: 'Dentes', tipo_fio: 'Tipo de fio', remocao_media: 'Remocao media',
+        comprimento_cm: 'Comprimento (cm)', comprimento_cabo_m: 'Comprimento do cabo (m)',
+        altura_cm: 'Altura (cm)', dimensoes_cm: 'Dimensoes (cm)', capacidade_ml: 'Capacidade (ml)',
+        tipo_jato: 'Tipo de jato', fecho: 'Fecho', lavavel: 'Lavavel', uso: 'Uso',
+        compatibilidade: 'Compatibilidade', itens_inclusos: 'Itens inclusos', garantia: 'Garantia',
+        // Cursos e vale-presente
+        carga_horaria: 'Carga horaria', modulos: 'Modulos', formato: 'Formato', acesso: 'Acesso',
+        certificado: 'Certificado', nivel: 'Nivel', paginas: 'Paginas', validade: 'Validade',
+        valor: 'Valor', entregaveis: 'O que voce recebe',
+      };
+
+      const TITULO_FICHA = {
+        COSMETICO: 'Composicao e modo de uso',
+        FERRAMENTA: 'Ficha tecnica da ferramenta',
+        DIGITAL: 'Conteudo e formato de entrega',
+      };
+
+      let produto;
+      try {
+        produto = await API.produtoPorId(id);
+      } catch (e) {
+        UI.mensagem('avisoProduto', e.message);
+        return;
+      }
+
+      const estoque = produto.estoque || {};
+      const ilimitado = Boolean(estoque.ilimitado);
+      const qtd = Number(estoque.quantidade ?? 0);
+      const esgotado = !ilimitado && qtd <= 0;
+
+      const especificacoes = produto.especificacoes || {};
+      // Ficha em duas colunas: cada linha vira um par rotulo/valor.
+      const linhasFicha = Object.entries(especificacoes)
+        .map(([chave, valor]) => `
+          <div class="ficha__item">
+            <dt>${escapar(ROTULOS[chave] || chave)}</dt>
+            <dd>${escapar(valor)}</dd>
+          </div>`)
+        .join('');
+
+      alvo.innerHTML = `
+        <nav class="migalhas">
+          <a href="index.html">Inicio</a>
+          <span class="migalhas__sep">/</span>
+          <a href="produtos.html?categoria=${escapar(produto.categoria?.slug || '')}">${escapar(produto.categoria?.nome || 'Loja')}</a>
+          <span class="migalhas__sep">/</span>
+          <span>${escapar(produto.nome)}</span>
+        </nav>
+
+        <div class="detalhe">
+          <div class="detalhe__midia">
+            <div class="detalhe__imagem">
+              <img src="${escapar(produto.imagem || UI.IMAGEM_FALLBACK)}" alt="${escapar(produto.nome)}" ${UI.onErroImagem}>
+            </div>
+            <div class="detalhe__marcas">
+              ${produto.linha ? `<span class="tag tag--neutro">${escapar(produto.linha)}</span>` : ''}
+              ${produto.finalidade ? `<span class="tag tag--neutro">${escapar(produto.finalidade)}</span>` : ''}
+              ${produto.marca ? `<span class="tag tag--neutro">${escapar(produto.marca)}</span>` : ''}
+            </div>
+          </div>
+
+          <div class="detalhe__coluna">
+            <span class="detalhe__categoria">${escapar(produto.categoria?.nome || '')}</span>
+            <h1>${escapar(produto.nome)}</h1>
+            <p class="detalhe__descricao">${escapar(produto.descricao || '')}</p>
+
+            <div class="compra">
+              <div class="compra__linha">
+                <span class="detalhe__preco">${moeda(produto.preco)}</span>
+                <span class="tag tag--${esgotado ? 'off' : 'ok'}">
+                  ${ilimitado ? 'Entrega imediata' : esgotado ? 'Esgotado' : `${qtd} em estoque`}
+                </span>
+              </div>
+
+              <div class="compra__acoes">
+                <div class="quantidade">
+                  <button type="button" id="btnMenos" aria-label="Diminuir">-</button>
+                  <span id="qtdSelecionada">1</span>
+                  <button type="button" id="btnMais" aria-label="Aumentar">+</button>
+                </div>
+                <button class="btn btn--primario btn--bloco" id="btnAdicionar" ${esgotado ? 'disabled' : ''}>
+                  ${esgotado ? 'Produto esgotado' : 'Adicionar ao carrinho'}
+                </button>
+              </div>
+
+              <a href="carrinho.html" class="compra__link">Ir para o carrinho</a>
+
+              <ul class="compra__notas">
+                <li>Frete gratis acima de ${moeda(CONFIG.FRETE_GRATIS_ACIMA_DE)} em produtos fisicos.</li>
+                <li>Ate ${CONFIG.TETO_PERCENTUAL}% de desconto progressivo no fechamento.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        ${linhasFicha ? `
+          <section class="secao">
+            <div class="secao__cabecalho">
+              <div>
+                <span class="secao__etiqueta">Detalhes</span>
+                <h2>${TITULO_FICHA[produto.tipo] || 'Especificacoes'}</h2>
+                <p>Dados tecnicos informados pelo fabricante.</p>
+              </div>
+            </div>
+            <dl class="ficha">${linhasFicha}</dl>
+          </section>` : ''}`;
+
+      // ---- Seletor de quantidade respeitando o estoque ----
+      let quantidade = 1;
+      const limite = ilimitado ? Infinity : qtd;
+      const elQtd = document.getElementById('qtdSelecionada');
+
+      document.getElementById('btnMenos').addEventListener('click', () => {
+        quantidade = Math.max(1, quantidade - 1);
+        elQtd.textContent = quantidade;
+      });
+
+      document.getElementById('btnMais').addEventListener('click', () => {
+        if (quantidade + 1 > limite) {
+          alert(`Estoque disponivel: ${limite} unidade(s).`);
+          return;
+        }
+        quantidade += 1;
+        elQtd.textContent = quantidade;
+      });
+
+      document.getElementById('btnAdicionar').addEventListener('click', () => {
+        const resultado = Carrinho.adicionar(produto, quantidade);
+        if (resultado.ok) {
+          UI.aviso(resultado.mensagem, 'ok');
+        } else {
+          UI.aviso(resultado.mensagem, 'erro', 4200);
+          alert(resultado.mensagem);
+        }
+      });
+
+      // ---- Produtos relacionados ----
+      try {
+        const relacionados = (await API.listarProdutos({ categoria: produto.categoria?.slug }))
+          .filter((p) => p.id !== produto.id)
+          .slice(0, 4);
+
+        if (relacionados.length) {
+          document.getElementById('secaoRelacionados').style.display = 'block';
+          document.getElementById('gradeRelacionados').innerHTML = relacionados.map(UI.cardProduto).join('');
+          UI.ligarBotoesAdicionar('gradeRelacionados', relacionados);
+        }
+      } catch (_) { /* secao opcional */ }
+    })();
+  </script>
+</body>
+</html>
