@@ -30,7 +30,7 @@ const sequelize = connectionUrl
   : new Sequelize(
       process.env.DB_NAME || 'barbearia_breck',
       process.env.DB_USER || 'root',
-      process.env.DB_PASS || '',
+      process.env.DB_PASS || 'senai',
       {
         ...commonOptions,
         host: process.env.DB_HOST || 'localhost',
