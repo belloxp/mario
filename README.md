@@ -10,8 +10,9 @@ Você também precisa saber o **usuário e a senha** do seu MySQL (normalmente `
 ---
 
 ## 2. Criar o banco de dados
-
-Abra o terminal do MySQL (ou o MySQL Workbench) e rode:
+> Opção 1 : Abra o mySQL e crie manualmente o banco 'barbearia_breck'
+OU
+> Opção 2: Abra o terminal do MySQL (ou o MySQL Workbench) e rode:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS barbearia_breck
