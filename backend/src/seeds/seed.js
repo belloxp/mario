@@ -244,7 +244,7 @@ const PRODUTOS = [
 
 const USUARIOS = [
   {
-    nome: 'Guilherme Bello', email: 'admin@breckbarber.com', senha: 'admin123',
+    nome: 'Mário Biluk', email: 'admin@breckbarber.com', senha: 'admin123',
     cpf: '52998224725', telefone: '(11) 98888-1010', perfil: 'ADMIN',
     cep: '01310100', logradouro: 'Avenida Paulista', numero: '1578', complemento: 'Loja 3',
     bairro: 'Bela Vista', cidade: 'Sao Paulo', uf: 'SP',
